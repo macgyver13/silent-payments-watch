@@ -2,7 +2,7 @@
 
 Silent Payments Watch is a feed-first public-source activity tracker for BIP-352 Silent Payments and directly related work (BIP-375/376/392, scanning, wallets, hardware, and indexing).
 
-Engine comes from [source-watch](https://github.com/macgyver13/source-watch). This repo is the instance: seeds, identity, bootstrap feed snapshot, and the Worker. To pick up template bug fixes:
+Engine comes from [source-watch](https://github.com/macgyver13/source-watch). This repo is the instance: seeds, identity, and the Worker. To pick up template bug fixes:
 
 ```bash
 git fetch source-watch
@@ -13,7 +13,7 @@ Conflicts should stay in `config/`.
 
 This instance is **service mode**. Live site: https://silent-payments-watch.macgyver-dev.workers.dev/ — Worker + D1, not Pages.
 
-`data/public/` is the bootstrap snapshot from the former `preview/silent-payments` static site. The first ingest uses it when D1 is empty so `discovered_at` does not reset. Later collects read live rows from D1. Public feed JSON is not committed under `site/static/`.
+Public feed JSON is not committed. The collector ingests into D1; `/feed.json` and related artifacts are served from the Worker.
 
 ## Scope
 
@@ -47,7 +47,7 @@ npx wrangler deploy
 ```
 
 9. `serving.service_url` and `base_url` are `https://silent-payments-watch.macgyver-dev.workers.dev/`. After changing them, re-sync Hugo and redeploy so assets match.
-10. First ingest (from a machine with the token, or Actions `workflow_dispatch`). D1 is empty, so the collector reads `data/public/` and preserves discovery dates:
+10. First ingest already ran. Later collects (cron, Refresh now, or local) POST into D1:
 
 ```bash
 SOURCE_WATCH_INGEST_TOKEN=… GITHUB_TOKEN=$(gh auth token) python3 scripts/build_seed_feed.py
