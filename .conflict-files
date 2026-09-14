@@ -1,0 +1,3 @@
+ancestorEntries = ["wrangler.jsonc"]
+ourEntries = ["wrangler.jsonc"]
+theirEntries = ["wrangler.jsonc"]

@@ -1,0 +1,54 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "silent-payments-watch",
+	"main": "service/src/index.js",
+	"compatibility_date": "2026-09-09",
+	"build": {
+		"command": "hugo --source site --minify"
+	},
+	"assets": {
+		"directory": "./site/public",
+		"binding": "ASSETS",
+		"not_found_handling": "404-page",
+		"run_worker_first": [
+			"/api/*",
+			"/admin",
+			"/admin/*",
+			"/feed.json",
+			"/projects.json",
+			"/sources.json",
+			"/watch.json",
+			"/items.jsonl",
+			"/feed.xml",
+			"/weeks",
+			"/weeks/*"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "silent-payments-watch",
+			"database_id": "9c742cdb-846e-4c63-a27c-028400283a92"
+		}
+	],
+	"ratelimits": [
+		{
+			"name": "ADMIN_RATE_LIMIT",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 10,
+				"period": 60
+			}
+		}
+	],
+	"triggers": {
+		"crons": [
+			"22 3 * * *"
+		]
+	},
+	"vars": {
+		"GITHUB_DISPATCH_REPO": "macgyver13/silent-payments-watch",
+		"GITHUB_DISPATCH_WORKFLOW": "refresh-feed.yml",
+		"GITHUB_DISPATCH_REF": "main"
+	}
+}

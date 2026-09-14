@@ -1,0 +1,24 @@
+{{ define "main" }}
+{{- $isRoot := or (eq .RelPermalink "/topics/") (eq .RelPermalink "/topics") -}}
+{{- $watch := site.Data.watch | default dict -}}
+{{- $topics := $watch.topics | default slice -}}
+<div class="wrap">
+  {{- if $isRoot -}}
+  <div class="hero">
+    {{ partial "crumb.html" (dict "section" "Topics") }}
+    <h1>Topics</h1>
+    <p class="lede">{{ if gt (len $topics) 0 }}{{ len $topics }} tracked term{{ if ne (len $topics) 1 }}s{{ end }}. The name opens its working notes; the count opens filtered activity.{{ else }}Add topics in <code>config/watch.yaml</code> to create a topic ledger.{{ end }}</p>
+  </div>
+  {{ partial "topic-ledger.html" (dict "heading" false) }}
+  {{- else -}}
+  <div class="hero">
+    {{ partial "crumb.html" (dict "section" "Topics" "extra" .Title) }}
+    <h1>{{ .Title }}</h1>
+    {{- with .Params.blurb }}<p class="lede">{{ . }}</p>{{ end }}
+  </div>
+  <div class="prose">
+    {{ .Content }}
+  </div>
+  {{- end -}}
+</div>
+{{ end }}

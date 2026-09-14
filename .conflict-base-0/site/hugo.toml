@@ -1,0 +1,14 @@
+baseURL = "https://silent-payments-watch.macgyver-dev.workers.dev/"
+locale = "en-us"
+title = "Silent Payments Watch"
+enableRobotsTXT = true
+disablePathToLower = true
+
+[params]
+  description = "Public activity on Silent Payments and related work."
+  serving_mode = "service"
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true

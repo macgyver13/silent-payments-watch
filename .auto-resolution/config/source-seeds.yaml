@@ -1,0 +1,89 @@
+# Seeded sources and live collectors for this watch instance.
+# Identity (name, base_url, description, default_tag, chips, topics, relevance,
+# discovered_after) lives in config/watch.yaml. This file is only seeds + collectors.
+#
+# Leave these lists empty for a blank fork. Add entries, then run
+# scripts/build_seed_feed.py to fill site/static artifacts.
+#
+# Optional per seed:
+#   discovered_at:  ISO timestamp; weeks use this. Live GitHub created_at
+#                   overwrites this for seeded repos/PRs on or after
+#                   watch.yaml discovered_after (unset = no floor).
+#   activity_at:    ISO timestamp; latest-activity views use this.
+#   live_activity:  false to skip GitHub pushed_at on noisy monorepos
+#                   (pair with github_pull_requests for the real PRs).
+#                   created_at is still used for discovery unless it is
+#                   before discovered_after.
+# Seeded GitHub repos/PRs take live created_at as discovered_at when that
+# stamp is on or after discovered_after; older created_at keeps the seed date.
+# Live GitHub searches use repo created_at as discovered_at (hits before
+# discovered_after are dropped).
+# Live GitHub PR searches use pull created_at / updated_at. A seeded
+# parent repo does not hide matching PRs.
+# Live Delving collectors use topic created_at / last_posted_at.
+# Category listings take a numeric id or parent/slug/id path
+# (example: 12 or implementation/wg-silent-payments/12). Slug alone 404s.
+#
+# Example:
+# seeded_sources:
+#   docs_pages:
+#     - id: example-docs
+#       name: Example docs
+#       url: https://example.com/docs
+#       project: Example
+#       tags: [docs]
+#       summary: A page this watch should track.
+#   github_repositories:
+#     - id: example-repo
+#       repo: example/repo
+#       project: Example
+#       tags: [docs]
+#       summary: A repository this watch should track.
+#   github_pull_requests:
+#     - id: example-pr
+#       name: "example/repo #1"
+#       url: https://github.com/example/repo/pull/1
+#       project: Example
+#       tags: [docs, pull-request]
+# live_collectors:
+#   github_repository_searches:
+#     - id: example-search
+#       query: 'topic:documentation archived:false'
+#       max_results: 5
+#       tags: [example, github, candidate, repository-discovery]
+#   github_pull_request_searches:
+#     - id: example-pr-search
+#       query: 'topic:documentation is:pr'
+#       max_results: 5
+#       tags: [example, github, candidate, pull-request-discovery]
+#   delving_topic_searches:
+#     - id: example-delving-frost
+#       query: 'frost in:title'
+#       max_results: 5
+#       tags: [example, delving, candidate, topic-discovery]
+#     - id: example-delving-silent-payments
+#       query: '"silent payments" in:title'
+#       max_results: 5
+#       tags: [example, delving, candidate, topic-discovery]
+#     - id: example-delving-quantum
+#       query: 'quantum in:title'
+#       max_results: 5
+#       tags: [example, delving, candidate, topic-discovery]
+#   delving_category_listings:
+#     - id: example-delving-category
+#       category: 12
+#       max_results: 10
+#       tags: [example, delving, candidate, topic-discovery]
+
+
+seeded_sources:
+  docs_pages: []
+  github_repositories: []
+  github_pull_requests: []
+  crates: []
+
+live_collectors:
+  github_repository_searches: []
+  github_pull_request_searches: []
+  delving_topic_searches: []
+  delving_category_listings: []

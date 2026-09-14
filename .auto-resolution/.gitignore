@@ -1,0 +1,12 @@
+.venv/
+site/public/
+site/.hugo_build.lock
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.wrangler/
+node_modules/
+.dev.vars
+wrangler.dev.jsonc
+

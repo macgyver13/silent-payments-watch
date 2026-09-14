@@ -1,0 +1,24 @@
+{{- $here := .here -}}
+{{- $latestWeek := "/weeks/" -}}
+{{- with site.GetPage "/weeks" -}}
+  {{- with (index (sort .Sections "RelPermalink" "desc") 0) -}}
+    {{- $latestWeek = .RelPermalink -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq site.Params.serving_mode "service" }}{{ $latestWeek = "/weeks/" }}{{ end -}}
+
+<section class="start" aria-label="Start here">
+  <div class="start-label">Start here</div>
+  <div class="start-grid">
+    <a class="start-tile{{ if eq $here "week" }} here{{ end }}" href="{{ $latestWeek }}">
+      <div class="k">This week <i>→</i></div>
+      <div class="d">What showed up this ISO week.</div>
+      <div class="n" data-count="week-new">new this week</div>
+    </a>
+    <a class="start-tile{{ if eq $here "projects" }} here{{ end }}" href="/projects/">
+      <div class="k">Projects <i>→</i></div>
+      <div class="d">Tracked work, grouped by project.</div>
+      <div class="n" data-count="projects">projects</div>
+    </a>
+  </div>
+</section>
