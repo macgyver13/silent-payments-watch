@@ -1,131 +1,97 @@
-# Source Watch
+# Silent Payments Watch
 
-Source Watch is a feed-first public-source tracker. Fill the config, generate artifacts, and host the Hugo site on Cloudflare Pages (static mode) or a Cloudflare Worker with D1 (service mode).
+Silent Payments Watch is a feed-first public-source activity tracker for BIP-352 Silent Payments and directly related work (BIP-375/376/392, scanning, wallets, hardware, and indexing).
 
-Primary artifacts:
+Engine comes from [source-watch](https://github.com/macgyver13/source-watch). This repo is the instance: seeds, identity, bootstrap feed snapshot, and the Worker. To pick up template bug fixes:
 
-- `feed.json` — canonical latest structured feed
-- `feed.xml` — RSS feed
-- `items.jsonl` — normalized item stream
-- `projects.json` — project catalog
-- `sources.json` — monitored source catalog
-- `watch.json` — instance identity for the client (name, chips, hidden tags, topics)
+```bash
+git fetch source-watch
+git merge source-watch/main
+```
 
-The Hugo site under `site/` renders the public website from these artifacts.
+Conflicts should stay in `config/`.
 
-Committed `feed.json`, `feed.xml`, `items.jsonl`, `projects.json`, and `sources.json` ship empty so a fork starts blank. Fill `config/source-seeds.yaml` and run the pipeline to populate them. Do not commit another project's live feed into this template.
+This instance is **service mode**. Live site: https://silent-payments-watch.macgyver-dev.workers.dev/ — Worker + D1, not Pages.
 
-## How to use
-
-1. Fork or copy this repository.
-2. Fill `config/watch.yaml` (name, base URL, description, tags, relevance, optional topics, optional `serving`).
-3. Fill `config/source-seeds.yaml` with the docs pages, repositories, PRs, and crates to track, plus any live GitHub repository/PR searches or Delving topic collectors.
-4. **static:** run the local pipeline so `site/static/` has fresh artifacts, then point Cloudflare Pages or GitHub Pages at `site/`.
-   **service:** do not publish those JSON files. Follow **Cloudflare Worker (service mode)** below; the collector ingests into D1.
-
-Seeds are pipeline input. In static mode Pages/Hugo only compile `site/` and serve JSON already in `site/static/`. In service mode a seed or YAML change lands on the next ingest.
-
-Agent-oriented stand-up (first deploy, secrets, `/admin`): see `AGENTS.md`.
-
-Static instances refresh the feed locally (or with your own CI). Service instances use `.github/workflows/refresh-feed.yml` via opt-in Worker cron or `workflow_dispatch`.
-
+`data/public/` is the bootstrap snapshot from the former `preview/silent-payments` static site. The first ingest uses it when D1 is empty so `discovered_at` does not reset. Later collects read live rows from D1. Public feed JSON is not committed under `site/static/`.
 
 ## Scope
 
 This project aggregates public source metadata and activity. Inclusion is not endorsement, technical review, security assessment, production-readiness judgment, or a canonical roadmap.
 
-## Host locally
+## Wire the Worker (once)
 
-Needs Python 3, [PyYAML](https://pyyaml.org/) (`pip3 install pyyaml`), and [Hugo](https://gohugo.io/). Pages pins `HUGO_VERSION=0.164.0`; a current extended build is fine locally.
+Needs Node 22+, Wrangler (`npm ci`), Python 3, PyYAML, Hugo `0.164.0`, and a Cloudflare account that can finish `renderAll` (a few thousand items exceeds the free-plan 10 ms CPU cap).
+
+1. `npm ci`
+2. `npx wrangler login` if this machine is not already authenticated.
+3. D1 `silent-payments-watch` already exists (`database_id` `9c742cdb-846e-4c63-a27c-028400283a92` in `wrangler.jsonc`). Do not create another.
+4. Apply migrations: `npx wrangler d1 migrations apply silent-payments-watch --remote`
+5. Secrets (same values locally in `.dev.vars` for local Worker only; production tokens are Wrangler/Actions secrets):
+
+| Secret | Where | Used for |
+|---|---|---|
+| `ADMIN_TOKEN` | `npx wrangler secret put ADMIN_TOKEN` | Bearer token for `/api/admin/*` and the `/admin` UI |
+| `INGEST_TOKEN` | `npx wrangler secret put INGEST_TOKEN` | Worker side of collector ingest |
+| `SOURCE_WATCH_INGEST_TOKEN` | GitHub Actions secret **and** local env | Collector; **same value as** `INGEST_TOKEN` |
+| `GITHUB_DISPATCH_TOKEN` | `npx wrangler secret put GITHUB_DISPATCH_TOKEN` | Worker cron / Refresh now → `workflow_dispatch` (`actions:write`) |
+| `GITHUB_TOKEN` | Actions provides this | Collector GitHub API |
+
+6. `wrangler.jsonc` `vars.GITHUB_DISPATCH_REPO` is already `macgyver13/silent-payments-watch`. Keep `GITHUB_DISPATCH_WORKFLOW=refresh-feed.yml` and `GITHUB_DISPATCH_REF=main`.
+7. `python3 scripts/sync_hugo_content.py` (already a service Hugo shell after promote).
+8. Deploy: dashboard Build command `hugo --source site --minify`, Deploy command `npx wrangler deploy`, `HUGO_VERSION=0.164.0`. Or locally:
 
 ```bash
-python3 scripts/build_seed_feed.py --seed-only
-python3 scripts/sync_hugo_content.py
-python3 scripts/verify_public_artifacts.py
-hugo server --source site
-```
-
-Open http://localhost:1313/. Empty seeds still render the site chrome with an empty feed.
-
-`hugo server` does not run the Python pipeline. Re-run the scripts after config or seed changes, then refresh the browser.
-
-## Local pipeline
-
-```bash
-python3 scripts/build_seed_feed.py
-python3 scripts/sync_hugo_content.py
-python3 scripts/verify_public_artifacts.py
 hugo --source site --minify
+npx wrangler deploy
 ```
 
-`python3 scripts/build_seed_feed.py` refreshes seeded GitHub repo/PR
-timestamps and runs live collectors
-(`github_repository_searches`, `github_pull_request_searches`,
-`delving_topic_searches`, `delving_category_listings`). Repository search
-does not see PRs inside an already-seeded repo; PR search does. Each
-collector emits **candidate** `source_discovered` items alongside seeds.
-A candidate is a search or category hit that passed `watch.yaml`
-`relevance` and, if set, `discovered_after`; it is not yet in the accepted
-`seeded_sources` catalog. Hits whose name, URL, or text contains
-`source-watch` (this engine and forks) are dropped.
-Seeded GitHub repos/PRs take live `created_at` as `discovered_at` when that
-stamp is on or after `discovered_after`; older `created_at` keeps the seed
-date. Activity moves if GitHub or Delving is newer. Docs, crates, and
-`--seed-only` keep seed or first-seen discovery.
-
-Seed-only (no GitHub or Delving HTTP):
+9. `serving.service_url` and `base_url` are `https://silent-payments-watch.macgyver-dev.workers.dev/`. After changing them, re-sync Hugo and redeploy so assets match.
+10. First ingest (from a machine with the token, or Actions `workflow_dispatch`). D1 is empty, so the collector reads `data/public/` and preserves discovery dates:
 
 ```bash
-python3 scripts/build_seed_feed.py --seed-only
-# or: SOURCE_WATCH_SKIP_LIVE=1 python3 scripts/build_seed_feed.py
+SOURCE_WATCH_INGEST_TOKEN=… GITHUB_TOKEN=$(gh auth token) python3 scripts/build_seed_feed.py
+python3 scripts/verify_public_artifacts.py
 ```
 
-## Cloudflare Pages (static mode)
-
-- Root directory: `site`
-- Build command: `hugo --minify`
-- Build output directory: `public`
-- Environment: `HUGO_VERSION=0.164.0`
-
-
-Pages builds Hugo from `site/`. Feed artifacts in `site/static/` come from the Python pipeline above. Do not create a Worker for a `serving.mode: static` instance.
-
-## Cloudflare Worker (service mode)
-
-Set `serving.mode: service` in `config/watch.yaml`. The Worker serves Hugo assets, live `/feed.json` from D1, and `/admin`. The Python collector POSTs into the service instead of writing `site/static/`.
-
-Numbered first deploy, secret matrix, and operator notes: `AGENTS.md` **Service mode**. Short path:
-
-1. `npx wrangler d1 create source-watch` → paste `database_id` into `wrangler.jsonc`.
-2. `npx wrangler d1 migrations apply source-watch --remote`
-3. `npx wrangler secret put ADMIN_TOKEN` and `INGEST_TOKEN` (collector env `SOURCE_WATCH_INGEST_TOKEN` must be the **same value** as `INGEST_TOKEN`). Optional `GITHUB_DISPATCH_TOKEN` plus `vars.GITHUB_DISPATCH_REPO`. Refresh cron is off by default; set the same expression in `triggers.crons` and `vars.REFRESH_CRON` (for example `17 2 * * *` for 02:17 UTC daily).
-4. `python3 scripts/sync_hugo_content.py`. Former static site: `python3 scripts/promote_to_service.py` then sync again.
-5. Build `hugo --source site --minify`, deploy `npx wrangler deploy`, `HUGO_VERSION=0.164.0`.
-6. Set `serving.service_url` and `base_url` to `https://<worker>.<subdomain>.workers.dev/`. Ingest: `SOURCE_WATCH_INGEST_TOKEN=… python3 scripts/build_seed_feed.py`. `--seed-only` requires `--allow-partial-ingest`.
+`--seed-only` in service mode requires `--allow-partial-ingest` and will not pick up live candidates.
 
 `GET /admin` is public chrome; APIs need `ADMIN_TOKEN`. Failed admin auths: 10 per IP per minute, then 429. Hide/exclude update the public feed immediately; include terms and seed additions apply on the next collect.
 
-Local Worker: `.dev.vars` with `ADMIN_TOKEN` / `INGEST_TOKEN`, Node 22+, `npx wrangler d1 migrations apply source-watch --local`, `npx wrangler dev --test-scheduled`, ingest against `http://localhost:8787/`.
+## Refresh
 
+The Worker cron (`27 2 * * *`, 02:27 UTC daily) POSTs GitHub `workflow_dispatch` for `.github/workflows/refresh-feed.yml`. That workflow runs the collector and ingests; it commits nothing. `vars.REFRESH_CRON` must match that expression so leftover Cloudflare cadences are skipped. If `GITHUB_DISPATCH_TOKEN` is empty, cron writes `refresh_skipped` and `/admin` shows `refresh not configured`. Staggered 10 minutes after frost-watch so the two collectors do not share the same GitHub/Delving burst.
 
+Manual:
 
-## GitHub Pages
+```bash
+SOURCE_WATCH_INGEST_TOKEN=… GITHUB_TOKEN=$(gh auth token) python3 scripts/build_seed_feed.py
+```
 
-Use the same Hugo settings: build from `site/` with `hugo --minify`,
-`HUGO_VERSION=0.164.0`, output `public`.
+## Local Worker
 
-A typical setup is a GitHub Pages workflow (or the Pages UI) that publishes
-the Hugo output, or a `gh-pages` branch containing the built `public/`
-directory.
+Put `ADMIN_TOKEN=devadmin` and `INGEST_TOKEN=devingest` in `.dev.vars` (gitignored). Temporarily set `serving.service_url: "http://localhost:8787/"`.
+
+```bash
+python3 scripts/sync_hugo_content.py
+npx wrangler d1 migrations apply silent-payments-watch --local
+npx wrangler dev --test-scheduled
+# other shell:
+SOURCE_WATCH_INGEST_TOKEN=devingest \
+  python3 scripts/build_seed_feed.py --seed-only --allow-partial-ingest
+```
+
+Open http://localhost:8787/ and http://localhost:8787/admin (token `devadmin`). Live collect: `GITHUB_TOKEN=$(gh auth token) SOURCE_WATCH_INGEST_TOKEN=devingest python3 scripts/build_seed_feed.py`.
 
 ## Config
 
-- `config/watch.yaml` — instance identity: name, base URL, description, default tag, preferred chips, hidden tags, relevance rules, optional `discovered_after` (ISO date; drop live hits and ignore GitHub `created_at` before this), optional topic tiles, optional `serving` (`mode: static|service`; `service_url` required in service mode). Chips, hidden tags, and name ship in `watch.json` for the client. `relevance` filters live collector hits (`always_match` short-circuits accept; `required_any` / `context_any` must appear in the GitHub description/topics, PR title/body, or Delving title/excerpt/tags).
+- `config/watch.yaml` — instance identity, relevance, `discovered_after`, `serving` (`mode: service`; `service_url` required before ingest).
 - `config/source-seeds.yaml` — seeded sources and live collectors. Pipeline input only; not read at request time.
-
 
 ## Tests
 
 ```bash
 python3 -m unittest discover -s tests -v
+npm test
+npm run smoke:d1
 ```
