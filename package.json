@@ -1,5 +1,5 @@
 {
-  "name": "source-watch",
+  "name": "silent-payments-watch",
   "private": true,
   "type": "module",
   "scripts": {
